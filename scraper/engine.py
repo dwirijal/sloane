@@ -149,6 +149,8 @@ async def scrape_site_links(
         '/schedule', '/bookmark', '/login', '/register', '/genre/',
         '/tag/', '/category/', '/page/', '/feed', '/xmlrpc',
         '/wp-admin', '/wp-login', '/wp-content/plugins',
+        '/list', '/jadwal', '/pasang-iklan', '/iklan', '/pustaka',
+        '/daftar', '/plus', '/hot', '/top', '/new',
     ]
 
     async with httpx.AsyncClient(
