@@ -211,6 +211,20 @@ class OploverzScraper(SiteScraper):
         super().__init__("https://oploverz.fans/", "anime")
 
 
+class OtakuDesuScraper(SiteScraper):
+    """Scraper for otakudesu.blog - Indonesian anime streaming."""
+
+    def __init__(self):
+        super().__init__("https://otakudesu.blog/", "anime")
+
+    def extract_title(self, soup: BeautifulSoup) -> str:
+        """Extract title, stripping 'Sub Indo' suffix."""
+        title = super().extract_title(soup)
+        # Remove common "Sub Indo" suffixes
+        title = re.sub(r'\s*Sub\s*Indo.*$', '', title, flags=re.IGNORECASE)
+        return title.strip()
+
+
 class MangaPlusScraper(SiteScraper):
     """Scraper for mangaplus.shueisha.co.jp - Official manga platform."""
 
@@ -232,6 +246,7 @@ SCRAPER_REGISTRY = {
     "komiku.org": KomikuScraper,
     "keikomik.web.id": KeikomikScraper,
     "oploverz.fans": OploverzScraper,
+    "otakudesu.blog": OtakuDesuScraper,
     "mangaplus.shueisha.co.jp": MangaPlusScraper,
 }
 

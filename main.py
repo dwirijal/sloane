@@ -30,6 +30,8 @@ TARGET_SITES = [
     "https://mangaplus.shueisha.co.jp",
     "http://168.144.97.24/",
     "https://139.59.196.140/",
+    "http://154.203.167.63/",
+    "https://otakudesu.blog/",
 ]
 
 

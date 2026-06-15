@@ -4,7 +4,7 @@ import os
 # Add scraper directory to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'scraper'))
 
-from sites import get_scraper_for_url, SamehadakuScraper, AnichinScraper, KomikuScraper, KeikomikScraper, OploverzScraper, MangaPlusScraper, GenericScraper
+from sites import get_scraper_for_url, SamehadakuScraper, AnichinScraper, KomikuScraper, KeikomikScraper, OploverzScraper, OtakuDesuScraper, MangaPlusScraper, GenericScraper
 
 def test_get_scraper_for_url_samehadaku():
     scraper = get_scraper_for_url("https://v2.samehadaku.how/some-path")
@@ -45,3 +45,16 @@ def test_get_scraper_for_url_generic():
 def test_get_scraper_for_url_case_insensitive():
     scraper = get_scraper_for_url("HTTPS://V2.SAMEHADAKU.HOW/")
     assert isinstance(scraper, SamehadakuScraper)
+
+def test_get_scraper_for_url_otakudesu():
+    scraper = get_scraper_for_url("https://otakudesu.blog/anime/")
+    assert isinstance(scraper, OtakuDesuScraper)
+    assert scraper.content_type == "anime"
+    assert scraper.domain == "otakudesu.blog"
+
+def test_ip3_is_targeted():
+    """Verify ip3 is in TARGET_SITES."""
+    sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+    from main import TARGET_SITES
+    assert "http://154.203.167.63/" in TARGET_SITES
+    assert "https://otakudesu.blog/" in TARGET_SITES
