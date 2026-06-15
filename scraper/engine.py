@@ -79,6 +79,17 @@ async def scrape_batch(
                         results["failed"] += 1
                         return None
 
+                    # Skip non-content pages (navigation, utilities, etc.)
+                    skip_titles = {'search', 'history', 'list', 'home', 'bookmark', 'schedule',
+                                   'login', 'register', 'about', 'contact', 'privacy', 'dmca',
+                                   'completed', 'ongoing', 'networks', 'countries', 'years', 'genres',
+                                   'bookmarks', 'settings', 'profile', 'rss', 'feed', 'sitemap',
+                                   'index', 'archive', 'categories', 'tags', 'authors'}
+                    if title.strip().lower() in skip_titles:
+                        logger.info(f"Skipping non-content page: {title} ({url})")
+                        results["failed"] += 1
+                        return None
+
                     content_type = scraper.content_type
                     cover = scraper.extract_cover(soup)
                     description = None
