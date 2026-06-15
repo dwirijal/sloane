@@ -188,23 +188,20 @@ class KomikuScraper(SiteScraper):
 
 
 class KeikomikScraper(SiteScraper):
-    """Scraper for keikomik.web.id - Indonesian comics."""
+    """Scraper for keikomik.web.id - Indonesian comics.
+
+    NOTE: This site uses client-side rendering (Next.js). Static HTML scraping
+    with httpx will only return "Loading..." placeholders. Requires Playwright
+    or similar headless browser for proper extraction.
+    """
 
     def __init__(self):
         super().__init__("https://keikomik.web.id/", "comic")
 
     def extract_pages(self, soup: BeautifulSoup) -> List[Dict]:
-        pages = []
-        imgs = soup.find_all('img', {'data-src': True})
-        for i, img in enumerate(imgs):
-            src = img.get('data-src') or img.get('src')
-            if src and not src.endswith(('.gif', '.svg')):
-                pages.append({
-                    'chapter': 1,
-                    'page_number': i + 1,
-                    'url': urljoin(self.base_url, src)
-                })
-        return pages
+        # Static scraping won't work for this site
+        logger.warning("Keikomik requires JavaScript rendering - skipping static extraction")
+        return []
 
 
 class OploverzScraper(SiteScraper):
