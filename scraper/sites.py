@@ -114,6 +114,22 @@ class SiteScraper:
         """Extract manga page URLs. Override per site."""
         return []
 
+    def extract_year(self, soup: BeautifulSoup) -> Optional[int]:
+        """Extract release year. Override per site."""
+        return None
+
+    def extract_rating(self, soup: BeautifulSoup) -> Optional[float]:
+        """Extract rating (0-10). Override per site."""
+        return None
+
+    def extract_genres(self, soup: BeautifulSoup) -> Optional[str]:
+        """Extract comma-separated genres. Override per site."""
+        return None
+
+    def extract_status(self, soup: BeautifulSoup) -> Optional[str]:
+        """Extract status (ongoing/completed). Override per site."""
+        return None
+
 
 class SamehadakuScraper(SiteScraper):
     """Scraper for v2.samehadaku.how - Indonesian anime streaming."""
@@ -200,7 +216,8 @@ class KeikomikScraper(SiteScraper):
 
     def extract_pages(self, soup: BeautifulSoup) -> List[Dict]:
         # Static scraping won't work for this site
-        logger.warning("Keikomik requires JavaScript rendering - skipping static extraction")
+        import logging
+        logging.warning("Keikomik requires JavaScript rendering - skipping static extraction")
         return []
 
 
@@ -263,6 +280,64 @@ class BridgesScraper(SiteScraper):
 
     def __init__(self):
         super().__init__("https://bridgestoabrighterfuture.org/", "movie")
+
+    def extract_title(self, soup: BeautifulSoup) -> str:
+        """Extract title from movie detail page or card structure."""
+        # First try: h1.entry-title (movie detail page)
+        h1 = soup.find('h1', class_='entry-title')
+        if h1:
+            return self.clean_title(h1.get_text(strip=True))
+
+        # Second try: <a> tag with title attribute (movie list cards)
+        link = soup.find('a', attrs={'title': True})
+        if link and link.get('title'):
+            title = link.get('title')
+            # Remove "Permalink ke: " prefix if present
+            title = re.sub(r'^Permalink ke:\s*', '', title, flags=re.IGNORECASE)
+            return self.clean_title(title)
+
+        # Fallback to parent class method
+        return super().extract_title(soup)
+
+    def extract_year(self, soup: BeautifulSoup) -> Optional[int]:
+        """Extract release year from movie detail page."""
+        # Look for year in the main content area, not the whole page
+        content = soup.find('div', class_=re.compile(r'gmr-content|entry-content|post-content', re.I))
+        if not content:
+            content = soup  # Fallback to whole page
+
+        text = content.get_text()
+        # Look for patterns like "2025" in the content area
+        matches = re.findall(r'\b(20\d{2})\b', text)
+        if matches:
+            # Return the most recent year (likely the release year)
+            return max(int(y) for y in matches if int(y) >= 2000)
+        return None
+
+    def extract_rating(self, soup: BeautifulSoup) -> Optional[float]:
+        """Extract rating from movie detail page."""
+        rating_div = soup.find('div', class_='gmr-rating-item')
+        if rating_div:
+            text = rating_div.get_text()
+            matches = re.findall(r'\b(\d{1,2}\.\d+)\b', text)
+            if matches:
+                rating = float(matches[0])
+                # Clamp to 0-10 range
+                return min(10.0, max(0.0, rating))
+        return None
+
+    def extract_genres(self, soup: BeautifulSoup) -> Optional[str]:
+        """Extract genres if available in meta tags or card."""
+        # Check for genre in meta tags
+        meta_keywords = soup.find('meta', attrs={'name': 'keywords'})
+        if meta_keywords and meta_keywords.get('content'):
+            return meta_keywords['content']
+        return None
+
+    def extract_status(self, soup: BeautifulSoup) -> Optional[str]:
+        """Extract movie status (usually 'completed' for movies)."""
+        # Movies are typically completed, not ongoing
+        return 'completed'
 
 
 class KusonimeScraper(SiteScraper):

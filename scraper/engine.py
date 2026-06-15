@@ -93,6 +93,10 @@ async def scrape_batch(
                     content_type = scraper.content_type
                     cover = scraper.extract_cover(soup)
                     description = scraper.extract_description(soup)
+                    genres = scraper.extract_genres(soup)
+                    status = scraper.extract_status(soup)
+                    year = scraper.extract_year(soup)
+                    rating = scraper.extract_rating(soup)
 
                     # Store content (deduplication handled by ON CONFLICT)
                     content_id = await storage.upsert_content(
@@ -101,6 +105,10 @@ async def scrape_batch(
                         content_type=content_type,
                         description=description,
                         cover_url=cover,
+                        genres=genres,
+                        status=status,
+                        year=year,
+                        rating=rating,
                     )
 
                     # Store streams/downloads/pages
@@ -154,6 +162,9 @@ async def scrape_site_links(
         '/genres', '/years', '/networks', '/countries', '/movies', '/tv',
         '/shounen', '/fantasy', '/comedy', '/drama', '/action', '/adventure',
         '/series', '/ongoing', '/completed', '/upcoming', '/popular',
+        '/year/', '/country/', '/actor/', '/director/', '/indonesia/',
+        '/science-fiction/', '/mystery/', '/romance/', '/thriller/',
+        '/crime/', '/horror/', '/musical/', '/documentary/', '/war/',
     ]
 
     async with httpx.AsyncClient(
