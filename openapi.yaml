@@ -1,0 +1,347 @@
+openapi: 3.0.3
+info:
+  title: Sloane API
+  description: |
+    Data acquisition API for the dwizzyOS ecosystem.
+    Provides access to scraped content from 7 content types: anime, manga, movie, donghua, comic, novel, other.
+  version: 1.0.0
+  contact:
+    name: dwizzyOS
+    url: https://github.com/dwirijal/sloane
+
+servers:
+  - url: http://localhost:8080
+    description: Local development server
+  - url: https://api.sloane.dwizzy.my.id
+    description: Production API
+
+components:
+  schemas:
+    Content:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        title:
+          type: string
+          example: "Attack on Titan"
+        content_type:
+          type: string
+          enum: [anime, manga, movie, donghua, comic, novel, other]
+          example: anime
+        cover_url:
+          type: string
+          nullable: true
+          example: "https://example.com/cover.jpg"
+        episode_count:
+          type: integer
+          nullable: true
+          example: 25
+        chapter_count:
+          type: integer
+          nullable: true
+        status:
+          type: string
+          nullable: true
+          example: "completed"
+        genres:
+          type: string
+          nullable: true
+          example: "action,fantasy"
+        year:
+          type: integer
+          nullable: true
+          example: 2013
+        rating:
+          type: number
+          nullable: true
+          example: 9.1
+        last_scraped_at:
+          type: string
+          format: date-time
+          example: "2026-06-15T03:00:00Z"
+      required: [id, title, content_type]
+
+    Stream:
+      type: object
+      properties:
+        episode:
+          type: integer
+          example: 1
+        url:
+          type: string
+          example: "https://example.com/stream.mp4"
+        quality:
+          type: string
+          nullable: true
+          example: "1080p"
+      required: [episode, url]
+
+    Download:
+      type: object
+      properties:
+        episode:
+          type: integer
+          example: 1
+        url:
+          type: string
+          example: "https://example.com/download.zip"
+        label:
+          type: string
+          nullable: true
+          example: "Direct Download"
+      required: [episode, url]
+
+    Page:
+      type: object
+      properties:
+        chapter:
+          type: integer
+          example: 1
+        page_number:
+          type: integer
+          example: 1
+        url:
+          type: string
+          example: "https://example.com/page1.jpg"
+      required: [chapter, page_number, url]
+
+    ContentDetail:
+      allOf:
+        - $ref: '#/components/schemas/Content'
+        - type: object
+          properties:
+            streams:
+              type: array
+              items:
+                $ref: '#/components/schemas/Stream'
+            downloads:
+              type: array
+              items:
+                $ref: '#/components/schemas/Download'
+            pages:
+              type: array
+              items:
+                $ref: '#/components/schemas/Page'
+
+    PaginationMeta:
+      type: object
+      properties:
+        page:
+          type: integer
+          example: 1
+        limit:
+          type: integer
+          example: 20
+        total:
+          type: integer
+          example: 100
+        has_next:
+          type: boolean
+          example: true
+      required: [page, limit, total, has_next]
+
+    Error:
+      type: object
+      properties:
+        code:
+          type: integer
+          example: 404
+        message:
+          type: string
+          example: "Content not found"
+        details:
+          type: string
+          nullable: true
+      required: [code, message]
+
+  parameters:
+    PageParam:
+      name: page
+      in: query
+      description: Page number (1-indexed)
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+      example: 1
+
+    LimitParam:
+      name: limit
+      in: query
+      description: Number of items per page
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+      example: 20
+
+    TypeParam:
+      name: type
+      in: query
+      description: Filter by content type
+      schema:
+        type: string
+        enum: [anime, manga, movie, donghua, comic, novel, other]
+      example: anime
+
+paths:
+  /health:
+    get:
+      summary: Health check
+      description: Returns API health status
+      responses:
+        '200':
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+                  timestamp:
+                    type: string
+                    format: date-time
+                required: [status, timestamp]
+
+  /api/contents:
+    get:
+      summary: List all content
+      description: Returns paginated list of content with optional type filter
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+        - $ref: '#/components/parameters/TypeParam'
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Content'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+                  error:
+                    type: object
+                    nullable: true
+                required: [data, meta, error]
+
+  /api/contents/{id}:
+    get:
+      summary: Get content by ID
+      description: Returns detailed content including streams, downloads, and pages
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 1
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/ContentDetail'
+                  meta:
+                    type: object
+                    nullable: true
+                  error:
+                    type: object
+                    nullable: true
+                required: [data, meta, error]
+        '404':
+          description: Content not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    nullable: true
+                  meta:
+                    type: object
+                    nullable: true
+                  error:
+                    $ref: '#/components/schemas/Error'
+                required: [data, meta, error]
+
+  /api/trending:
+    get:
+      summary: Get trending content
+      description: Returns most recently scraped content
+      parameters:
+        - $ref: '#/components/parameters/LimitParam'
+        - $ref: '#/components/parameters/TypeParam'
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Content'
+                  meta:
+                    type: object
+                    nullable: true
+                  error:
+                    type: object
+                    nullable: true
+                required: [data, meta, error]
+
+  /api/search:
+    get:
+      summary: Search content
+      description: Full-text search across content titles and descriptions
+      parameters:
+        - name: q
+          in: query
+          required: true
+          description: Search query
+          schema:
+            type: string
+          example: "titan"
+        - $ref: '#/components/parameters/LimitParam'
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Content'
+                  meta:
+                    type: object
+                    properties:
+                      query:
+                        type: string
+                        example: "titan"
+                      total:
+                        type: integer
+                        example: 5
+                  error:
+                    type: object
+                    nullable: true
+                required: [data, meta, error]
