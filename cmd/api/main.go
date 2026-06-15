@@ -102,13 +102,17 @@ type clientEntry struct {
 	lastSeen time.Time
 }
 
-// writeError sends a JSON error response
+// writeError sends a JSON error response in standard dwizzyOS envelope
 func writeError(w http.ResponseWriter, message string, code int) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"error": message,
-		"code":  code,
+		"data": nil,
+		"meta": nil,
+		"error": map[string]interface{}{
+			"code":    code,
+			"message": message,
+		},
 	})
 }
 
@@ -261,39 +265,49 @@ func (s *Server) handleContents() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		contentType := r.URL.Query().Get("type")
+		pageStr := r.URL.Query().Get("page")
 		limitStr := r.URL.Query().Get("limit")
-		offsetStr := r.URL.Query().Get("offset")
+
+		page := 1
+		if p, err := strconv.Atoi(pageStr); err == nil && p > 0 {
+			page = p
+		}
 
 		limit := 50
 		if l, err := strconv.Atoi(limitStr); err == nil && l > 0 && l <= 100 {
 			limit = l
 		}
 
-		offset := 0
-		if o, err := strconv.Atoi(offsetStr); err == nil && o >= 0 {
-			offset = o
-		}
-
+		offset := (page - 1) * limit
 		contents, total, err := s.db.GetContents(ctx, contentType, limit, offset)
 		if err != nil {
 			writeError(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 
-		cacheKey := fmt.Sprintf("contents:%s:%d:%d", contentType, limit, offset)
+		hasNext := (page * limit) < total
+		cacheKey := fmt.Sprintf("contents:%s:%d:%d", contentType, page, limit)
 		s.cacheSet(ctx, cacheKey, map[string]interface{}{
-			"total": total,
-			"limit": limit,
-			"offset": offset,
-			"items": contents,
+			"data": contents,
+			"meta": map[string]interface{}{
+				"page":    page,
+				"limit":   limit,
+				"total":   total,
+				"has_next": hasNext,
+			},
+			"error": nil,
 		})
 
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]interface{}{
-			"total": total,
-			"limit": limit,
-			"offset": offset,
-			"items": contents,
+			"data": contents,
+			"meta": map[string]interface{}{
+				"page":    page,
+				"limit":   limit,
+				"total":   total,
+				"has_next": hasNext,
+			},
+			"error": nil,
 		})
 	}
 }
@@ -401,16 +415,6 @@ func (s *Server) handleTrending() http.HandlerFunc {
 			return
 		}
 
-		cacheKey := fmt.Sprintf("trending:%s:%d", contentType, limit)
-		s.cacheSet(ctx, cacheKey, map[string]interface{}{
-			"data": contents,
-			"meta": map[string]interface{}{
-				"limit": limit,
-				"total": len(contents),
-			},
-			"error": nil,
-		})
-
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]interface{}{
 			"data": contents,
@@ -430,9 +434,12 @@ func (s *Server) handleSearch() http.HandlerFunc {
 		if query == "" {
 			w.Header().Set("Content-Type", "application/json")
 			json.NewEncoder(w).Encode(map[string]interface{}{
-				"query": "",
-				"count": 0,
-				"items": []interface{}{},
+				"data": []interface{}{},
+				"meta": map[string]interface{}{
+					"query": "",
+					"total": 0,
+				},
+				"error": nil,
 			})
 			return
 		}
@@ -462,9 +469,12 @@ func (s *Server) handleSearch() http.HandlerFunc {
 		}
 
 		result := map[string]interface{}{
-			"query":    query,
-			"count":    len(contents),
-			"contents": contents,
+			"data": contents,
+			"meta": map[string]interface{}{
+				"query": query,
+				"total": len(contents),
+			},
+			"error": nil,
 		}
 
 		// Cache search results for 60 seconds (shorter than other endpoints due to freshness)
