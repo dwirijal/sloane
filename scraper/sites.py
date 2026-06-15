@@ -33,6 +33,39 @@ class SiteScraper:
         title = h1.get_text(strip=True) if h1 else "Unknown Title"
         return self.clean_title(title)
 
+    def extract_description(self, soup: BeautifulSoup) -> Optional[str]:
+        """Extract description/synopsis with multiple fallback strategies."""
+        # Strategy 1: meta description tag
+        meta_desc = soup.find('meta', attrs={'name': 'description'})
+        if meta_desc and meta_desc.get('content'):
+            return meta_desc['content'].strip()
+
+        # Strategy 2: og:description meta tag
+        og_desc = soup.find('meta', attrs={'property': 'og:description'})
+        if og_desc and og_desc.get('content'):
+            return og_desc['content'].strip()
+
+        # Strategy 3: twitter:description meta tag
+        tw_desc = soup.find('meta', attrs={'name': 'twitter:description'})
+        if tw_desc and tw_desc.get('content'):
+            return tw_desc['content'].strip()
+
+        # Strategy 4: entry-content class (common for WordPress sites)
+        entry_content = soup.find(class_=re.compile(r'entry-content|post-content|article-body|desc', re.I))
+        if entry_content:
+            text = entry_content.get_text(strip=True)
+            if len(text) > 50:
+                return text
+
+        # Strategy 5: content class
+        content = soup.find(class_=re.compile(r'content|description|synopsis|info', re.I))
+        if content:
+            text = content.get_text(strip=True)
+            if len(text) > 50:
+                return text
+
+        return None
+
     def extract_cover(self, soup: BeautifulSoup) -> Optional[str]:
         """Extract cover image URL with multiple fallback strategies."""
         # Strategy 1: og:image meta tag (most reliable)

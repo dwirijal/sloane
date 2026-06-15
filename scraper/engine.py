@@ -92,10 +92,7 @@ async def scrape_batch(
 
                     content_type = scraper.content_type
                     cover = scraper.extract_cover(soup)
-                    description = None
-                    meta_desc = soup.find("meta", attrs={"name": "description"})
-                    if meta_desc and meta_desc.get("content"):
-                        description = meta_desc["content"].strip()
+                    description = scraper.extract_description(soup)
 
                     # Store content (deduplication handled by ON CONFLICT)
                     content_id = await storage.upsert_content(
