@@ -1,0 +1,176 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: sloane-postgres
+    environment:
+      POSTGRES_USER: sloane
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-sloane_secure_password}
+      POSTGRES_DB: sloane
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sloane"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.8'
+
+  pgbouncer:
+    image: edoburu/pgbouncer:latest
+    container_name: sloane-pgbouncer
+    environment:
+      DB_USER: sloane
+      DB_PASSWORD: ${DB_PASSWORD:-sloane_secure_password}
+      DB_HOST: postgres
+      DB_NAME: sloane
+      POOL_MODE: transaction
+      MAX_CLIENT_CONN: 100
+      DEFAULT_POOL_SIZE: 20
+    ports:
+      - "6432:6432"
+    volumes:
+      - ./pgbouncer/pgbouncer.ini:/etc/pgbouncer/pgbouncer.ini:ro
+      - ./pgbouncer/userlist.txt:/etc/pgbouncer/userlist.txt:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 64M
+          cpus: '0.2'
+
+  valkey:
+    image: valkey/valkey:8-alpine
+    container_name: sloane-valkey
+    command: valkey-server --save 300 1 --maxmemory 128mb --maxmemory-policy allkeys-lru
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+          cpus: '0.3'
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    container_name: sloane-api
+    environment:
+      DATABASE_URL: postgresql://sloane:${DB_PASSWORD:-sloane_secure_password}@pgbouncer:6432/sloane
+      VALKEY_ADDR: valkey:6379
+      CACHE_TTL: 300
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      pgbouncer:
+        condition: service_started
+      valkey:
+        condition: service_healthy
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+          cpus: '0.5'
+
+  dispatcher:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: sloane-dispatcher
+    environment:
+      DATABASE_URL: postgresql://sloane:${DB_PASSWORD:-sloane_secure_password}@pgbouncer:6432/sloane
+      CONCURRENCY: 3
+      MAX_RETRIES: 3
+      TIMEOUT_SECS: 30
+      SCRAPE_SITES: https://v2.samehadaku.how/,https://anichin.cafe/,https://komiku.org/,https://keikomik.web.id/,https://oploverz.fans/,https://mangaplus.shueisha.co.jp,http://168.144.97.24/,https://139.59.196.140/
+    depends_on:
+      postgres:
+        condition: service_healthy
+      pgbouncer:
+        condition: service_started
+    restart: on-failure
+    profiles:
+      - full
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.5'
+
+  scraper:
+    build:
+      context: .
+      dockerfile: scraper/Dockerfile
+    container_name: sloane-scraper
+    environment:
+      DATABASE_URL: postgresql://sloane:${DB_PASSWORD:-sloane_secure_password}@pgbouncer:6432/sloane
+      CONCURRENCY: 2
+      MAX_RETRIES: 3
+      TIMEOUT_SECS: 30
+    depends_on:
+      postgres:
+        condition: service_healthy
+      pgbouncer:
+        condition: service_started
+    restart: on-failure
+    profiles:
+      - full
+
+  backfill:
+    build:
+      context: .
+      dockerfile: Dockerfile.backfill
+    container_name: sloane-backfill
+    environment:
+      DATABASE_URL: postgresql://sloane:${DB_PASSWORD:-sloane_secure_password}@pgbouncer:6432/sloane
+      BACKFILL_CONCURRENCY: 3
+      BACKFILL_DELAY: 2.0
+      BACKFILL_MAX_LINKS: 20
+    volumes:
+      - ./logs:/app/logs
+    depends_on:
+      postgres:
+        condition: service_healthy
+      pgbouncer:
+        condition: service_started
+    restart: "no"
+    profiles:
+      - backfill
+
+  cron:
+    image: alpine:latest
+    container_name: sloane-cron
+    command: |
+      sh -c '
+        echo "0 */6 * * * cd /app && docker compose --profile backfill run --rm backfill" > /etc/crontabs/root &&
+        crond -f -l 8
+      '
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - .:/app
+    restart: unless-stopped
+    profiles:
+      - cron
+
+volumes:
+  postgres_data:

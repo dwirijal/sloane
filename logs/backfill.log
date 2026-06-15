@@ -1,0 +1,2 @@
+2026-06-14 22:15:47,802 - INFO - Starting backfill: concurrency=3, delay=2.0s, max_links=20
+2026-06-14 22:15:47,809 - ERROR - Fatal error: Multiple exceptions: [Errno 111] Connect call failed ('::1', 5432, 0, 0), [Errno 111] Connect call failed ('127.0.0.1', 5432)
