@@ -85,6 +85,29 @@ PostgreSQL → Go API Server (Chi) → jawatch frontend
 - Run dispatcher: `docker compose --profile full run --rm dispatcher` or `go run cmd/dispatcher/main.go`
 - Backfill: `docker compose --profile backfill run --rm backfill` or `python backfill.py`
 
+## Testing
+Scraper tests are located in the `tests/` directory using pytest.
+
+```bash
+# Install dependencies (includes pytest and pytest-asyncio)
+pip install -r scraper/requirements.txt
+
+# Run all tests
+pytest tests/ -v
+
+# Run specific test file
+pytest tests/test_sites.py -v
+
+# Run with coverage
+pytest tests/ --cov=scraper --cov-report=term-missing
+```
+
+### Test Coverage
+- **test_sites.py**: Tests for scraper site registry and URL matching (8 tests)
+- **test_engine.py**: Tests for scraping engine functions (2 tests)
+
+**Note**: Requires pytest 8.3.5+ and pytest-asyncio 0.25.0+ (included in scraper/requirements.txt)
+
 ## Commit Style
 - Conventional Commits: `type(scope): description`
 - Types: feat, fix, refactor, docs, test, chore, perf, ci
