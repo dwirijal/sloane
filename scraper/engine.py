@@ -151,6 +151,9 @@ async def scrape_site_links(
         '/wp-admin', '/wp-login', '/wp-content/plugins',
         '/list', '/jadwal', '/pasang-iklan', '/iklan', '/pustaka',
         '/daftar', '/plus', '/hot', '/top', '/new',
+        '/genres', '/years', '/networks', '/countries', '/movies', '/tv',
+        '/shounen', '/fantasy', '/comedy', '/drama', '/action', '/adventure',
+        '/series', '/ongoing', '/completed', '/upcoming', '/popular',
     ]
 
     async with httpx.AsyncClient(
