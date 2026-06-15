@@ -8,7 +8,9 @@ go.sum
 
 # Binaries
 /dispatcher
-/scraper
+# /scraper - allow python source commits
+!scraper/*.py
+!scraper/*.txt
 
 # Python
 __pycache__/
