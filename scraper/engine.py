@@ -169,7 +169,7 @@ async def scrape_site_links(
             href = a['href'].strip()
 
             # Skip non-content links
-            if any(href.lower().startswith(p) or href.lower() == p.rstrip('/') for p in SKIP_PATTERNS):
+            if any(p in href.lower() for p in SKIP_PATTERNS):
                 continue
 
             # Normalize relative URLs
