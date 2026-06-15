@@ -32,6 +32,10 @@ TARGET_SITES = [
     "https://139.59.196.140/",
     "http://154.203.167.63/",
     "https://otakudesu.blog/",
+    "https://animasu.care/",
+    "https://kanzenin.info/",
+    "https://bridgestoabrighterfuture.org/",
+    "https://kusonime.com/",
 ]
 
 

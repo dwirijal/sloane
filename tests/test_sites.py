@@ -4,7 +4,7 @@ import os
 # Add scraper directory to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'scraper'))
 
-from sites import get_scraper_for_url, SamehadakuScraper, AnichinScraper, KomikuScraper, KeikomikScraper, OploverzScraper, OtakuDesuScraper, MangaPlusScraper, GenericScraper
+from sites import get_scraper_for_url, SamehadakuScraper, AnichinScraper, KomikuScraper, KeikomikScraper, OploverzScraper, OtakuDesuScraper, AnimasuScraper, KanzeninScraper, BridgesScraper, MangaPlusScraper, GenericScraper
 
 def test_get_scraper_for_url_samehadaku():
     scraper = get_scraper_for_url("https://v2.samehadaku.how/some-path")
@@ -58,3 +58,21 @@ def test_ip3_is_targeted():
     from main import TARGET_SITES
     assert "http://154.203.167.63/" in TARGET_SITES
     assert "https://otakudesu.blog/" in TARGET_SITES
+    assert "https://animasu.care/" in TARGET_SITES
+    assert "https://kanzenin.info/" in TARGET_SITES
+    assert "https://bridgestoabrighterfuture.org/" in TARGET_SITES
+
+def test_get_scraper_for_url_animasu():
+    scraper = get_scraper_for_url("https://animasu.care/")
+    assert isinstance(scraper, AnimasuScraper)
+    assert scraper.content_type == "anime"
+
+def test_get_scraper_for_url_kanzenin():
+    scraper = get_scraper_for_url("https://kanzenin.info/")
+    assert isinstance(scraper, KanzeninScraper)
+    assert scraper.content_type == "manga"
+
+def test_get_scraper_for_url_bridges():
+    scraper = get_scraper_for_url("https://bridgestoabrighterfuture.org/")
+    assert isinstance(scraper, BridgesScraper)
+    assert scraper.content_type == "movie"

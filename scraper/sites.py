@@ -209,6 +209,18 @@ class OploverzScraper(SiteScraper):
 
     def __init__(self):
         super().__init__("https://oploverz.fans/", "anime")
+        self.title_strip_patterns = [
+            r'\s*[-–]\s*oploverz\.best\s*\|\s*Situs\s*Oploverz\s*yang\s*asli$',
+            r'^oploverz\.best\s*\|\s*Situs\s*Oploverz\s*yang\s*asli\s*[-–]\s*',
+        ]
+
+    def clean_title(self, title: str) -> str:
+        """Strip common site suffixes, but preserve navigation page titles."""
+        if 'List Mode - oploverz.best' in title:
+            return title
+        for pattern in self.title_strip_patterns:
+            title = re.sub(pattern, '', title, flags=re.IGNORECASE).strip()
+        return title.strip(' –-— ')
 
 
 class OtakuDesuScraper(SiteScraper):
@@ -232,6 +244,34 @@ class MangaPlusScraper(SiteScraper):
         super().__init__("https://mangaplus.shueisha.co.jp/", "manga")
 
 
+class AnimasuScraper(SiteScraper):
+    """Scraper for animasu.care - Indonesian anime streaming."""
+
+    def __init__(self):
+        super().__init__("https://animasu.care/", "anime")
+
+
+class KanzeninScraper(SiteScraper):
+    """Scraper for kanzenin.info - Indonesian manga/comic platform."""
+
+    def __init__(self):
+        super().__init__("https://kanzenin.info/", "manga")
+
+
+class BridgesScraper(SiteScraper):
+    """Scraper for bridgestoabrighterfuture.org - Indonesian movie streaming."""
+
+    def __init__(self):
+        super().__init__("https://bridgestoabrighterfuture.org/", "movie")
+
+
+class KusonimeScraper(SiteScraper):
+    """Scraper for kusonime.com - Indonesian anime download site."""
+
+    def __init__(self):
+        super().__init__("https://kusonime.com/", "anime")
+
+
 class GenericScraper(SiteScraper):
     """Generic scraper for unknown sites."""
 
@@ -247,6 +287,10 @@ SCRAPER_REGISTRY = {
     "keikomik.web.id": KeikomikScraper,
     "oploverz.fans": OploverzScraper,
     "otakudesu.blog": OtakuDesuScraper,
+    "animasu.care": AnimasuScraper,
+    "kanzenin.info": KanzeninScraper,
+    "bridgestoabrighterfuture.org": BridgesScraper,
+    "kusonime.com": KusonimeScraper,
     "mangaplus.shueisha.co.jp": MangaPlusScraper,
 }
 
