@@ -1,45 +1,36 @@
 """Pipeline tools exposed to sloane agents.
 
-Agents orchestrate (decide what/when); tools do the deterministic work
-(fetch, validate, write, assert). LLM never touches DB directly — it calls
-these functions via ADK's FunctionTool. Keeps the 24/7 loop reproducible and
-budget-capped: each tool call is one bounded step.
-
-Tool names = function names (ADK convention). Instructions reference the
-exact names so the LLM doesn't hallucinate variants.
+Agents orchestrate; tools do deterministic work. 3-layer flow:
+  fetch_source -> write raw -> merge raw->canonical -> assert both layers.
+LLM never touches DB directly; tools return counts so agents report status.
 """
 from __future__ import annotations
 from google.adk.tools import FunctionTool
 
 from shared.config import pg_dsn
 from shared.migrations_runner import ensure_schema
+from shared.schema_contract import CanonicalEntity
 from sloane.db.writer import write_entities
-from shared.memory_service import GroupMemoryService
+from sloane.store.merger import merge_raw_to_canonical
 import sloane.sources  # noqa: F401  register plugins
 from sloane.sources.registry import REGISTRY
-from shared.schema_contract import CanonicalEntity
 
 
 def fetch_source(source_slug: str) -> list[dict]:
-    """Fetch all entities from a registered source slug. Returns a list of dicts."""
+    """Fetch all entities from a registered source slug."""
     cls = REGISTRY.get(source_slug)
     if cls is None:
         raise ValueError(f"unknown source {source_slug!r}; known: {list(REGISTRY)}")
     out = []
     for e in cls().fetch():
         e.validate()
-        out.append({
-            "source": e.source, "external_id": e.external_id, "kind": e.kind,
-            "title": e.title, "url": e.url, "payload": e.payload,
-        })
+        out.append({"source": e.source, "external_id": e.external_id, "kind": e.kind,
+                    "title": e.title, "url": e.url, "payload": e.payload})
     return out
 
 
 def write_entities_tool(entities: list[dict]) -> dict:
-    """Upsert entities to PG (dedup by source+external_id). Returns {inserted,updated}.
-
-    Extra LLM-added keys are folded into payload, never crash the pipeline.
-    """
+    """Write raw entities + merge each into canonical. Returns raw/canonical counts."""
     dsn = pg_dsn(); ensure_schema(dsn)
     keep = {"source", "external_id", "kind", "title", "url", "payload"}
     ents = []
@@ -50,29 +41,38 @@ def write_entities_tool(entities: list[dict]) -> dict:
             fields["payload"] = {**(fields.get("payload") or {}), **extra}
         ents.append(CanonicalEntity(**fields))
     r = write_entities(dsn, ents)
-    return {"inserted": r.inserted, "updated": r.updated}
+    # merge each raw -> canonical (registry IDs not yet available; title merge now)
+    merged_new = 0
+    for rid, ent in zip(r.raw_ids, ents):
+        m = merge_raw_to_canonical(rid, ent.title, ent.kind, ent.payload, dsn=dsn)
+        merged_new += 1 if m["merged"] else 0
+    return {"raw_inserted": r.inserted, "raw_updated": r.updated,
+            "canonical_new": merged_new, "canonical_total": len(r.raw_ids)}
 
 
 def assert_quality(source_slug: str, expected: int | None = None) -> dict:
-    """Quality gate: verify rows for source in DB. Returns {passed, checks, rows}."""
+    """Quality gate: verify raw rows for source + canonical merge happened."""
     import psycopg
     dsn = pg_dsn()
     with psycopg.connect(dsn) as c, c.cursor() as cur:
         cur.execute(
-            "SELECT source, external_id, kind, title, payload->>'episodes' AS eps "
-            "FROM canonical_entities WHERE source=%s ORDER BY title",
-            (source_slug,),
-        )
+            "SELECT external_id, kind, title FROM raw_entities WHERE source=%s ORDER BY title",
+            (source_slug,))
         rows = cur.fetchall()
+        cur.execute(
+            "SELECT count(*) FROM entity_source_links l "
+            "JOIN raw_entities r ON r.id=l.raw_id WHERE r.source=%s", (source_slug,))
+        links = cur.fetchone()[0]
     checks = {
-        "rows_present": len(rows) > 0,
-        "no_null_title": all(r[3] for r in rows),
-        "no_null_kind": all(r[2] for r in rows),
-        "no_null_external_id": all(r[1] for r in rows),
+        "raw_rows_present": len(rows) > 0,
+        "no_null_title": all(r[2] for r in rows),
+        "no_null_kind": all(r[1] for r in rows),
+        "no_null_external_id": all(r[0] for r in rows),
         "count_ok": expected is None or len(rows) == expected,
+        "merged_to_canonical": links == len(rows),
     }
-    return {"source": source_slug, "row_count": len(rows),
-            "passed": all(checks.values()), "checks": checks, "rows": rows}
+    return {"source": source_slug, "raw_count": len(rows), "links": links,
+            "passed": all(checks.values()), "checks": checks}
 
 
 fetch_tool = FunctionTool(func=fetch_source)
