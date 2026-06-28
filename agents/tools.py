@@ -41,13 +41,19 @@ def write_entities_tool(entities: list[dict]) -> dict:
             fields["payload"] = {**(fields.get("payload") or {}), **extra}
         ents.append(CanonicalEntity(**fields))
     r = write_entities(dsn, ents)
-    # merge each raw -> canonical (registry IDs not yet available; title merge now)
+    # merge each raw -> canonical. Sources carrying registry_ids (e.g. jikan mal_id)
+    # merge ID-first; scrapers merge by cleaned title then LLM fuzzy.
     merged_new = 0
+    methods: dict[str, int] = {}
     for rid, ent in zip(r.raw_ids, ents):
-        m = merge_raw_to_canonical(rid, ent.title, ent.kind, ent.payload, dsn=dsn)
+        reg = (ent.payload or {}).get("registry_ids")
+        m = merge_raw_to_canonical(rid, ent.title, ent.kind, ent.payload,
+                                   registry_ids=reg, dsn=dsn)
+        methods[m["method"]] = methods.get(m["method"], 0) + 1
         merged_new += 1 if m["merged"] else 0
     return {"raw_inserted": r.inserted, "raw_updated": r.updated,
-            "canonical_new": merged_new, "canonical_total": len(r.raw_ids)}
+            "canonical_new": merged_new, "canonical_total": len(r.raw_ids),
+            "merge_methods": methods}
 
 
 def assert_quality(source_slug: str, expected: int | None = None) -> dict:
