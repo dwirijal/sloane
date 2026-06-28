@@ -1,4 +1,4 @@
-"""Source package. Importing this registers all source plugins."""
-from sloane.sources import stub  # noqa: F401  (side-effect: registers slug)
+"""Source package. Importing registers all source plugins."""
+from sloane.sources import stub, oploverz  # noqa: F401  (side-effect: register)
 
-__all__ = ["stub"]
+__all__ = ["stub", "oploverz"]
