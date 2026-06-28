@@ -11,13 +11,13 @@ exact names so the LLM doesn't hallucinate variants.
 from __future__ import annotations
 from google.adk.tools import FunctionTool
 
-from sloane.config.settings import pg_dsn
-from sloane.db.migrations_runner import ensure_schema
+from shared.config import pg_dsn
+from shared.migrations_runner import ensure_schema
 from sloane.db.writer import write_entities
-from sloane.db.memory_service import GroupMemoryService
+from shared.memory_service import GroupMemoryService
 import sloane.sources  # noqa: F401  register plugins
 from sloane.sources.registry import REGISTRY
-from sloane.schema.contract import CanonicalEntity
+from shared.schema_contract import CanonicalEntity
 
 
 def fetch_source(source_slug: str) -> list[dict]:

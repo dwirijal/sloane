@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from typing import Iterable
 
 import psycopg
-from sloane.schema.contract import CanonicalEntity
+from shared.schema_contract import CanonicalEntity
 
 
 @dataclass(frozen=True)

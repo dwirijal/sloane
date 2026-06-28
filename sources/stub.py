@@ -8,7 +8,7 @@ samehadaku, ...) are added later by the agent squad as separate plugins.
 from __future__ import annotations
 from collections.abc import Iterator
 
-from sloane.schema.contract import CanonicalEntity, KIND_ANIME
+from shared.schema_contract import CanonicalEntity, KIND_ANIME
 from sloane.sources.base import BaseSource, register
 
 
