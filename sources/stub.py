@@ -3,7 +3,7 @@
 Emits a small, deterministic, valid set of CanonicalEntity rows so the
 end-to-end pipeline (fetch -> validate -> dedup -> write PG -> assert) can be
 proven 24/7-ready before wiring real scrapers. Real scrapers (oploverz,
-samehadaku, ...) are added later by the agent squad as separate plugins.
+samehadaku, ...) are added as separate plugins.
 """
 from __future__ import annotations
 from collections.abc import Iterator
