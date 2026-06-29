@@ -9,12 +9,20 @@ merge_raw + enrich. State in DB; runner otherwise stateless.
 daily job (discover_new_series): anime-terbaru -> slugs absent from raw_entities
 -> full series fetch -> write_entities -> merge -> enrich.
 
-No concurrency, no per-post transactions. Idempotency (write_entities ON
-CONFLICT + merge_raw ON CONFLICT) protects a mid-run crash: redundant work at
-worst, never duplicate data.
+backfill (backfill_all): full historical ingest of every series from
+daftar-anime-2 (~728), each with ALL episodes + batches parsed for download
+links. Concurrent (httpx.AsyncClient + N workers, rate-capped) because the
+scale (~36k episode pages for the long runners) makes sequential impractical.
+Resumable: skips series already in raw_entities, so a crash + re-run continues.
+
+Idempotency (write_entities ON CONFLICT + merge_raw ON CONFLICT) protects a
+mid-run crash: redundant work at worst, never duplicate data.
 """
 from __future__ import annotations
 
+import asyncio
+
+import httpx
 import psycopg
 
 from shared.config import pg_dsn
@@ -23,7 +31,7 @@ from sloane.db.writer import write_entities
 from sloane.store.merger import merge_raw_to_canonical
 from sloane.store.enricher import enrich_canonical
 from sloane.store.state import get_state, add_seen
-from sloane.sources.samehadaku import _downloads, _feed, _http, _lists
+from sloane.sources.samehadaku import _detail, _downloads, _feed, _http, _lists
 
 SOURCE = "samehadaku"
 SEEN_KEY = "seen_feed_urls"
@@ -173,3 +181,128 @@ def discover_new_series(dsn: str | None = None, max_new: int | None = None) -> d
             except Exception:
                 continue
     return {"discovered": discovered, "ingested": ingested}
+
+
+# ---------------------------------------------------------------------------
+# Backfill: full historical ingest (all series + episodes + batches).
+# ---------------------------------------------------------------------------
+
+# Episode page fetches are the cost driver (One Piece alone = 1166). Cap
+# concurrency to respect the site (no anti-bot today, but 36k reqs needs a
+# leash). ponytail: raise to 12-16 once a run confirms no rate-limit 429s.
+BACKFILL_WORKERS = 6
+
+
+async def _fetch_one(cx: httpx.AsyncClient, url: str, sem: asyncio.Semaphore) -> str | None:
+    """Fetch one page under the concurrency semaphore. None on failure."""
+    async with sem:
+        try:
+            r = await cx.get(url, timeout=20)
+            r.raise_for_status()
+            return r.text
+        except Exception:
+            return None
+
+
+async def _fetch_series_full(cx, sem, slug: str, title: str, cover_url) -> dict | None:
+    """Fetch a series detail + ALL its episode + batch pages concurrently.
+
+    Returns the full payload dict (episodes+downloads, batches+downloads) for
+    one series, or None if the detail page itself failed.
+    """
+    series_url = f"{_http.BASE_URL}/anime/{slug}/"
+    detail_html = await _fetch_one(cx, series_url, sem)
+    if not detail_html:
+        return None
+    data = _detail.parse_series(detail_html, base=_http.BASE_URL)
+
+    # Fetch every episode page + every batch page concurrently.
+    ep_urls = [e["url"] for e in data["episodes"]]
+    ep_htmls = await asyncio.gather(*[_fetch_one(cx, u, sem) for u in ep_urls])
+    episodes = []
+    for ep, html in zip(data["episodes"], ep_htmls):
+        if not html:
+            continue  # dead episode page — keep its number/url, skip downloads
+        episodes.append({
+            "episode_number": ep["episode_number"],
+            "url": ep["url"],
+            "downloads": _downloads.parse_downloads(html),
+        })
+
+    bt_htmls = await asyncio.gather(*[_fetch_one(cx, u, sem) for u in data["batch_links"]])
+    batches = []
+    for bhref, html in zip(data["batch_links"], bt_htmls):
+        if not html:
+            continue
+        bslug, _ = _downloads.slug_and_ep(bhref)
+        batches.append({"slug": bslug, "url": bhref,
+                        "downloads": _downloads.parse_downloads(html)})
+
+    return {
+        "cover_url": cover_url, "synopsis": data["synopsis"],
+        "genres": data["genres"], "japanese": data["japanese"],
+        "english": data["english"], "alt_title": data["alt_title"],
+        "status": data["status"], "type": data["type"], "studio": data["studio"],
+        "season": data["season"], "released": data["released"],
+        "total_episode": data["total_episode"], "duration": data["duration"],
+        "rating": data["rating"], "source": data["source"],
+        "producers": data["producers"], "episodes": episodes, "batches": batches,
+    }
+
+
+async def _backfill_async(dsn, series, workers, log) -> dict:
+    sem = asyncio.Semaphore(workers)
+    ingested = failed = 0
+    async with httpx.AsyncClient(headers=_http.HEADERS, follow_redirects=True) as cx:
+        # Process series in small batches so DB writes (sync) interleave with
+        # fetches (async) — bounded memory, steady progress.
+        BATCH = 10
+        for i in range(0, len(series), BATCH):
+            chunk = series[i:i + BATCH]
+            results = await asyncio.gather(
+                *[_fetch_series_full(cx, sem, s["slug"], s["title"], s.get("cover_url"))
+                  for s in chunk]
+            )
+            for s, payload in zip(chunk, results):
+                slug = s["slug"]
+                if payload is None:
+                    failed += 1
+                    continue
+                try:
+                    raw_id = patch_series(dsn, slug, s["title"],
+                                          f"{_http.BASE_URL}/anime/{slug}/", payload)
+                    mr = merge_raw_to_canonical(raw_id, s["title"], KIND_ANIME,
+                                                payload, dsn=dsn)
+                    enrich_canonical(mr["canonical_id"], s["title"], KIND_ANIME, dsn=dsn)
+                    ingested += 1
+                except Exception:
+                    failed += 1
+            log(f"backfill: {min(i + BATCH, len(series))}/{len(series)} "
+                f"(ingested {ingested}, failed {failed})")
+    return {"total": len(series), "ingested": ingested, "failed": failed}
+
+
+def backfill_all(dsn: str | None = None, workers: int = BACKFILL_WORKERS,
+                 limit: int | None = None, log=print) -> dict:
+    """Full historical ingest: every series from daftar-anime-2 + all eps/batches.
+
+    Resumable: series already in raw_entities are skipped, so a crash + re-run
+    continues from where it stopped. `limit` caps the series count (smoke).
+    """
+    dsn = dsn or pg_dsn()
+    # 1. seed the full directory (sync, ~25 pages).
+    with _http.client() as cx:
+        all_series = _lists.walk_directory(cx)
+    if limit is not None:
+        all_series = all_series[:limit]
+
+    # 2. filter to series not yet in DB (resumable).
+    new_series = [s for s in all_series if load_series_payload(dsn, s["slug"]) is None]
+    log(f"backfill: {len(all_series)} series in directory, "
+        f"{len(new_series)} new ({len(all_series) - len(new_series)} already in DB)")
+
+    if not new_series:
+        return {"total": 0, "ingested": 0, "failed": 0, "skipped_existing": len(all_series)}
+
+    # 3. concurrent fetch + sync write.
+    return asyncio.run(_backfill_async(dsn, new_series, workers, log))
