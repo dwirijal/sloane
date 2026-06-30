@@ -24,7 +24,7 @@ def test_exact_match_still_works():
     mp = MonkeyPatch()
     mp.setattr((E.httpx, "get"),
                lambda *a, **k: _Resp([_mal(21, "One Piece"), _mal(20, "Naruto")]))
-    r = E.resolve_mal_id("One Piece", "anime")
+    r = E.resolve_mal_id("One Piece")
     mp.undo()
     assert r and r["mal_id"] == 21
 
@@ -34,7 +34,7 @@ def test_tier2_suffix_match_recovers_easy_miss():
     mp = MonkeyPatch()
     mp.setattr((E.httpx, "get"),
                lambda *a, **k: _Resp([_mal(48561, "Jujutsu Kaisen 0 Movie", "Movie")]))
-    r = E.resolve_mal_id("Jujutsu Kaisen 0", "anime")
+    r = E.resolve_mal_id("Jujutsu Kaisen 0")
     mp.undo()
     assert r and r["mal_id"] == 48561, r
 
@@ -45,7 +45,7 @@ def test_tier2_season_guard_blocks_s2_to_s1_poison():
     mp = MonkeyPatch()
     mp.setattr((E.httpx, "get"),
                lambda *a, **k: _Resp([_mal(49676, "Jaku-Chara Tomozaki-kun", "TV")]))
-    r = E.resolve_mal_id("Jaku-Chara Tomozaki-kun Season 2", "anime")
+    r = E.resolve_mal_id("Jaku-Chara Tomozaki-kun Season 2")
     mp.undo()
     assert r is None, f"guard failed: mapped S2 onto S1 {r}"
 
@@ -56,7 +56,7 @@ def test_tier2_season_guard_allows_when_mal_has_season_marker():
     mp = MonkeyPatch()
     mp.setattr((E.httpx, "get"),
                lambda *a, **k: _Resp([_mal(54464, "Mahoutsukai no Yome Season 2", "TV")]))
-    r = E.resolve_mal_id("Mahoutsukai no Yome Season 2 Cour 2", "anime")
+    r = E.resolve_mal_id("Mahoutsukai no Yome Season 2 Cour 2")
     mp.undo()
     assert r and r["mal_id"] == 54464, r
 
@@ -66,7 +66,7 @@ def test_low_overlap_returns_none():
     mp = MonkeyPatch()
     mp.setattr((E.httpx, "get"),
                lambda *a, **k: _Resp([_mal(1, "Totally Unrelated Anime", "TV")]))
-    r = E.resolve_mal_id("Kanteishi", "anime")
+    r = E.resolve_mal_id("Kanteishi")
     mp.undo()
     assert r is None
 
@@ -78,7 +78,7 @@ def test_movie_arc_series_resolves_without_movie_filter():
     mp.setattr((E.httpx, "get"),
                lambda *a, **k: _Resp([_mal(48561, "Jujutsu Kaisen 0 Movie", "Movie"),
                                       _mal(40748, "Jujutsu Kaisen", "TV")]))
-    r = E.resolve_mal_id("Jujutsu Kaisen 0", "anime")
+    r = E.resolve_mal_id("Jujutsu Kaisen 0")
     mp.undo()
     assert r and r["mal_id"] == 48561, r
 
@@ -90,6 +90,6 @@ def test_recap_movie_does_not_shadow_base_series():
     mp.setattr((E.httpx, "get"),
                lambda *a, **k: _Resp([_mal(40456, "Kimetsu no Yaiba Movie: Mugen Ressha-hen", "Movie"),
                                       _mal(38000, "Kimetsu no Yaiba", "TV")]))
-    r = E.resolve_mal_id("Kimetsu no Yaiba", "anime")
+    r = E.resolve_mal_id("Kimetsu no Yaiba")
     mp.undo()
     assert r and r["mal_id"] == 38000, r

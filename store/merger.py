@@ -13,7 +13,6 @@ Emits: new canonical row OR links raw to existing. Always inserts a link.
 raw_id -> canonical_id is 1:1 (one raw backs one canonical).
 """
 from __future__ import annotations
-import json
 import re
 
 import httpx

@@ -57,10 +57,8 @@ def _season_marker(s: str) -> str | None:
     return None
 
 
-def resolve_mal_id(title: str, kind: str | None = None) -> dict | None:
+def resolve_mal_id(title: str) -> dict | None:
     """Resolve a title to a MAL entry via Jikan. Returns {mal_id, title, type} or None.
-
-    kind hint narrows: anime sources -> anime endpoint; movies filter by type.
 
     Two tiers: (1) exact case-insensitive title match; (2) token-overlap >=0.8 with a
     season-suffix guard — query "X Season 2" only matches MAL entries carrying the same
@@ -108,13 +106,13 @@ def resolve_mal_id(title: str, kind: str | None = None) -> dict | None:
     return {"mal_id": best["mal_id"], "title": best.get("title", title), "type": best.get("type")}
 
 
-def enrich_canonical(canonical_id: int, title: str, kind: str,
+def enrich_canonical(canonical_id: int, title: str,
                      dsn: str | None = None) -> dict:
     """Resolve + persist a mal_id for a canonical entity. Idempotent."""
     import psycopg
     from shared.config import pg_dsn
     dsn = dsn or pg_dsn()
-    resolved = resolve_mal_id(title, kind)
+    resolved = resolve_mal_id(title)
     if not resolved:
         return {"canonical_id": canonical_id, "resolved": False}
     with psycopg.connect(dsn) as conn, conn.cursor() as cur:

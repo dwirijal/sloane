@@ -205,9 +205,10 @@ grace windows, retry queues, and a resident daemon. YAGNI applied hard.
   new-post count makes sequential fetch slow; <10/run makes it pointless now.
 - **Per-post transactional ingest** — add if mid-run crashes cause visible
   redundant re-work at scale; idempotency makes this a perf concern, not correctness.
-- **Other sources in the daemon** — jikan/kusonime/oploverz have no update problem
-  (jikan is top-anime snapshot, the others are full-scrape). Wire them in only if
-  they gain an incremental need.
+- **Other sources in the daemon** — jikan/kusonime/oploverz `.fetch()` plugins were
+  deleted (no runner, no caller); the source-plugin/REGISTRY machinery was dead.
+  When those sites gain an incremental need, build them as ingest runners on this
+  same pattern, not `.fetch()` plugins.
 - **`daftar-anime-2` full-directory pagination** — add for historical backfill;
   `anime-terbaru` covers fresh series discovery for the daily sweep.
 - **Feed pagination** (`/feed/?paged=2`) — add only if samehadaku ever exceeds

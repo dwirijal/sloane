@@ -176,7 +176,7 @@ def discover_new_series(dsn: str | None = None, max_new: int | None = None) -> d
                                       f"{_http.BASE_URL}/anime/{slug}/", payload)
                 mr = merge_raw_to_canonical(raw_id, item["title"], KIND_ANIME,
                                             payload, dsn=dsn)
-                enrich_canonical(mr["canonical_id"], item["title"], KIND_ANIME, dsn=dsn)
+                enrich_canonical(mr["canonical_id"], item["title"], dsn=dsn)
                 ingested += 1
             except Exception:
                 continue
@@ -273,7 +273,7 @@ async def _backfill_async(dsn, series, workers, log) -> dict:
                                           f"{_http.BASE_URL}/anime/{slug}/", payload)
                     mr = merge_raw_to_canonical(raw_id, s["title"], KIND_ANIME,
                                                 payload, dsn=dsn)
-                    enrich_canonical(mr["canonical_id"], s["title"], KIND_ANIME, dsn=dsn)
+                    enrich_canonical(mr["canonical_id"], s["title"], dsn=dsn)
                     ingested += 1
                 except Exception:
                     failed += 1
