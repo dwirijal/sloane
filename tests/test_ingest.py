@@ -3,9 +3,9 @@
 Verifies the delta logic (only unseen posts ingested) and idempotency
 (re-run ingests 0 new). Live end-to-end is the Task 6 integration smoke.
 """
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock
 
-from sloane.ingest.samehadaku import ingest_feed, patch_series, load_series_payload
+from sloane.ingest.samehadaku import ingest_feed
 import sloane.ingest.samehadaku as _ingest_mod
 from sloane.tests._monkeypatch import MonkeyPatch
 
@@ -36,7 +36,7 @@ def _mock_client():
     return cx
 
 
-def test_ingest_feed_deltas_and_ingests(monkeypatch=None):
+def test_ingest_feed_deltas_and_ingests():
     mp = MonkeyPatch()
     # seen already has ep-9998 -> only ep-9999 is new.
     mp.setattr("sloane.ingest.samehadaku.get_state",
@@ -62,7 +62,7 @@ def test_ingest_feed_deltas_and_ingests(monkeypatch=None):
     assert any(e["url"].endswith("episode-9999/") for e in patched["payload"]["episodes"])
 
 
-def test_ingest_feed_idempotent_re_run(monkeypatch=None):
+def test_ingest_feed_idempotent_re_run():
     mp = MonkeyPatch()
     # both eps already seen -> ingested 0, no add_seen calls, no patch calls.
     seen = ["https://v2.samehadaku.how/one-piece-episode-9999/",
@@ -79,7 +79,7 @@ def test_ingest_feed_idempotent_re_run(monkeypatch=None):
     assert add == []  # nothing new, no seen update
 
 
-def test_ingest_feed_skips_when_series_missing(monkeypatch=None):
+def test_ingest_feed_skips_when_series_missing():
     mp = MonkeyPatch()
     # brand-new series not in DB yet -> skipped, marked seen (don't retry).
     mp.setattr("sloane.ingest.samehadaku.get_state", lambda *a, default=None, **k: [])

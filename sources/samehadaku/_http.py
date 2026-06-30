@@ -15,10 +15,8 @@ HEADERS = {
     "Accept-Language": "en-US,en;q=0.9",
 }
 
-# Selectors verified live 2026-06-29.
-SEL_SERIES_ANCHOR = ".thumb a[itemprop='url']"     # list pages: href=/anime/{slug}
-SEL_COVER_IMG = "img.npws"                          # within anchor
-SEL_INFOX = ".infox"                                # series metadata block
+# Selectors verified live 2026-06-29. (Series-anchor/cover/infox selectors are
+# inlined at their use sites in _lists/_detail — kept here only the shared ones.)
 SEL_SYNOPSIS = ".entry-content, [itemprop='description'], .sinopsis"
 SEL_DOWNLOAD_BLOCK = "div.download-eps"            # episode + batch download container
 

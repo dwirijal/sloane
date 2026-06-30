@@ -1,7 +1,7 @@
-"""Parse samehadaku list endpoints into series / batch discovery rows.
+"""Parse samehadaku list endpoints into series discovery rows.
 
-anime-terbaru + daftar-anime-2 share the same `.thumb > a[itemprop=url]` structure.
-daftar-batch yields batch slugs only (no series). jadwal-rilis gives release_day.
+anime-terbaru + daftar-anime-2 share the same anchor structure. walk_directory
+paginates daftar-anime-2 front-to-back for the full series set (backfill seed).
 """
 from __future__ import annotations
 
@@ -75,49 +75,3 @@ def walk_directory(cx) -> list[dict]:
         all_series.extend(fresh)
     return all_series
 
-
-def parse_batch_list(html: str) -> list[str]:
-    """daftar-batch page -> [batch_slug, ...]. Bare slugs for later detail fetch."""
-    soup = BeautifulSoup(html, "lxml")
-    slugs: list[str] = []
-    seen: set[str] = set()
-    for a in soup.select("a[href*='/batch/']"):
-        path = urlparse(a.get("href", "")).path
-        m = re.search(r"/batch/([^/]+)/?$", path)
-        if not m:
-            continue
-        s = m.group(1)
-        if s not in seen:
-            seen.add(s)
-            slugs.append(s)
-    return slugs
-
-
-def parse_schedule(html: str) -> dict[str, list[str]]:
-    """jadwal-rilis -> {day: [series_slug, ...]}.
-
-    Samehadaku groups by weekday headings. Metadata only — no downloads here.
-    ponytail: structure is day-heading + .thumb anchors; if markup shifts, fall
-    back to nearest preceding heading per anchor.
-    """
-    soup = BeautifulSoup(html, "lxml")
-    schedule: dict[str, list[str]] = {}
-    # Walk the schedule widget; each day is a heading, series anchors follow.
-    for a in soup.select(".thumb a[itemprop='url'], a[href*='/anime/']"):
-        path = urlparse(a.get("href", "")).path
-        m = _SLUG_RE.search(path)
-        if not m:
-            continue
-        # Find nearest preceding heading text as the day label.
-        day = None
-        for h in a.find_all_previous(["h2", "h3", "h4"]):
-            txt = h.get_text(strip=True)
-            if txt:
-                day = txt
-                break
-        day = day or "Unknown"
-        schedule.setdefault(day, [])
-        slug = m.group(1)
-        if slug not in schedule[day]:
-            schedule[day].append(slug)
-    return schedule
