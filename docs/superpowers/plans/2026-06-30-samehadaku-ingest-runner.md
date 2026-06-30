@@ -13,7 +13,7 @@
 - **Run env:** Python at `/home/dwirijal/Projects/dwizzyOS/.venv-adk/bin/python` has `bs4`+`httpx`+`psycopg`. `PYTHONPATH=/home/dwirijal/Projects/dwizzyOS:/home/dwirijal/Projects/dwizzyOS/dwizzyOS-HQ` (sloane root + parent so `import sloane.*` and `import shared.*` both resolve).
 - **HTTP client:** reuse `sources/samehadaku/_http.py` — `BASE_URL = "https://v2.samehadaku.how"`, browser UA, `httpx.Client(headers=HEADERS, timeout=20, follow_redirects=True)`. No anti-bot; no CDP.
 - **DB access:** `shared.config.pg_dsn()` for the DSN. All DB ops use `psycopg.connect(dsn)`. Migrations live in `db/migrations/` as versioned SQL (`004_...` next).
-- **CanonicalEntity contract:** `from shared.schema_contract import CanonicalEntity, KIND_ANIME`. `write_entities(dsn, entities)` validates + UPSERTs raw rows (replaces `payload` wholesale — load-mutate-upsert, NOT a SQL per-field patch). `merge_raw_to_canonical(raw_id, title, kind, payload, registry_ids=None, dsn=None)` links raw→canonical. `enrich_canonical(canonical_id, title, kind, dsn=None)` resolves MAL id.
+- **CanonicalEntity contract:** `from shared.schema_contract import CanonicalEntity, KIND_ANIME`. `write_entities(dsn, entities)` validates + UPSERTs raw rows (replaces `payload` wholesale — load-mutate-upsert, NOT a SQL per-field patch). `merge_raw_to_canonical(raw_id, title, kind, payload, registry_ids=None, dsn=None)` links raw→canonical. `enrich_canonical(canonical_id, title, dsn=None)` resolves MAL id.
 - **Self-check convention:** each parser module has an `if __name__ == "__main__":` block asserting real behavior against the live site (see `store/merger.py:204`, `sources/samehadaku/_downloads.py:98`).
 - **YAGNI:** no concurrency, no per-post transactions, no other sources wired in. `ponytail:` comments mark every deliberate ceiling + upgrade path.
 - **Commit messages** end with `Co-Authored-By: Claude <noreply@anthropic.com>`.
@@ -372,7 +372,7 @@ Co-Authored-By: Claude <noreply@anthropic.com>"
   - `db/writer.py` → `write_entities(dsn, entities) -> WriteResult` (has `.raw_ids`).
   - `shared.schema_contract.py` → `CanonicalEntity`, `KIND_ANIME`.
   - `store/merger.py` → `merge_raw_to_canonical(raw_id, title, kind, payload, registry_ids=None, dsn=None)`.
-  - `store/enricher.py` → `enrich_canonical(canonical_id, title, kind, dsn=None)`.
+  - `store/enricher.py` → `enrich_canonical(canonical_id, title, dsn=None)`.
   - `shared.config.py` → `pg_dsn()`.
 - Produces:
   - `ingest_feed(dsn=None, max_new=None) -> dict` returning `{"fetched": int, "ingested": int, "skipped": int, "new_urls": list[str]}`.
@@ -617,7 +617,7 @@ def discover_new_series(dsn: str | None = None, max_new: int | None = None) -> d
                 raw_id = patch_series(dsn, slug, item["title"],
                                       f"{_http.BASE_URL}/anime/{slug}/", payload)
                 mr = merge_raw_to_canonical(raw_id, item["title"], KIND_ANIME, payload, dsn=dsn)
-                enrich_canonical(mr["canonical_id"], item["title"], KIND_ANIME, dsn=dsn)
+                enrich_canonical(mr["canonical_id"], item["title"], dsn=dsn)
                 ingested += 1
             except Exception:
                 continue

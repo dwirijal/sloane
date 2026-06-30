@@ -6,7 +6,7 @@
 
 ## Context
 
-sloane is a scraper. The `samehadaku` source plugin (added 2026-06-29) emits one
+sloane is a scraper. The `samehadaku` parser package (added 2026-06-29) emits one
 `CanonicalEntity` per anime series, with episodes + batches parsed into `payload`.
 Currently there is no runner: only `db/writer.write_entities`, `store/merger.merge_raw_to_canonical`,
 and `store/enricher.enrich_canonical` exist as functions, plus `__main__` self-checks.
@@ -205,10 +205,9 @@ grace windows, retry queues, and a resident daemon. YAGNI applied hard.
   new-post count makes sequential fetch slow; <10/run makes it pointless now.
 - **Per-post transactional ingest** — add if mid-run crashes cause visible
   redundant re-work at scale; idempotency makes this a perf concern, not correctness.
-- **Other sources in the daemon** — jikan/kusonime/oploverz `.fetch()` plugins were
-  deleted (no runner, no caller); the source-plugin/REGISTRY machinery was dead.
-  When those sites gain an incremental need, build them as ingest runners on this
-  same pattern, not `.fetch()` plugins.
+- **Other sources** — add when needed as `sources/<site>/` + `ingest/<site>.py`
+  runners on this same pattern. The old source-plugin/REGISTRY machinery was deleted
+  as dead code; sloane is scraper + ingestion, not an agent orchestrator.
 - **`daftar-anime-2` full-directory pagination** — add for historical backfill;
   `anime-terbaru` covers fresh series discovery for the daily sweep.
 - **Feed pagination** (`/feed/?paged=2`) — add only if samehadaku ever exceeds
