@@ -1,4 +1,5 @@
-"""Source package. Importing registers all source plugins."""
-from sloane.sources import stub, oploverz, kusonime, jikan, samehadaku  # noqa: F401
+"""Source packages: per-site parser modules composed by ingest runners.
 
-__all__ = ["stub", "oploverz", "kusonime", "jikan", "samehadaku"]
+samehadaku parsers live in sources/samehadaku/; the live ingest runner
+(2h feed-delta + daily discovery + backfill) is at sloane.ingest.samehadaku.
+"""
