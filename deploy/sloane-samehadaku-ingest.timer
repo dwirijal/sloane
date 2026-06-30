@@ -1,0 +1,11 @@
+[Unit]
+Description=Run sloane samehadaku ingest every 2h
+
+[Timer]
+# Every 2 hours, off the :00 mark to spread load.
+OnCalendar=*-*-* 00/2:00:00
+Persistent=true
+RandomizedDelaySec=300
+
+[Install]
+WantedBy=timers.target
