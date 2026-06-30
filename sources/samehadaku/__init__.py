@@ -1,4 +1,5 @@
-"""samehadaku source package. Importing registers the plugin."""
-from sloane.sources.samehadaku.source import SamehadakuSource  # noqa: F401
+"""samehadaku source package: parser modules (_http, _lists, _detail, _downloads, _feed).
 
-__all__ = ["SamehadakuSource"]
+Live ingest runner lives at sloane.ingest.samehadaku (RSS feed-delta + daily
+discovery + backfill). These modules are the parsing layer it composes.
+"""
