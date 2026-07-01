@@ -54,7 +54,16 @@ def parse_detail(html: str, base: str = _http.BASE_URL) -> dict:
     Unknown infox labels tolerated (robust to markup drift).
     """
     soup = BeautifulSoup(html, "lxml")
-    infox: dict = {"genres": []}
+    infox: dict = {
+        "type": None,
+        "status": None,
+        "studio": None,
+        "season": None,
+        "released": None,
+        "duration": None,
+        "country": None,
+        "genres": [],
+    }
 
     # Metadata: .infox <span><b>Label:</b> Value</span>. Walk .infox <b> tags.
     box = soup.select_one(".infox")
