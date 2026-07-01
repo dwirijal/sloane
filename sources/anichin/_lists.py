@@ -66,8 +66,10 @@ def walk_directory(cx) -> list[dict]:
     for show in _SHOWS:
         page = 1
         while True:
-            url = f"{_http.BASE_URL}/az-lists/?show={show}&page={page}"
-            items = _series_anchors(BeautifulSoup(cx.get(url).text, "lxml"))
+            url = f"{_http.BASE_URL}/az-lists/page/{page}/?show={show}"
+            soup = BeautifulSoup(cx.get(url).text, "lxml")
+            _strip_sidebar(soup)
+            items = _series_anchors(soup)
             if not items:
                 break
             for it in items:

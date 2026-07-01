@@ -20,10 +20,17 @@ def test_parse_update_list_returns_series():
     assert all(not i["slug"].startswith("anime") for i in items)
 
 def test_parse_update_list_strips_sidebar():
-    # sidebar .subSchh would add 6 duplicate latest-series; ensure dedup holds.
-    items = _lists.parse_update_list((FIX / "anichin_update.html").read_text())
-    slugs = [i["slug"] for i in items]
-    assert len(slugs) == len(set(slugs)), "duplicate slugs — sidebar not stripped"
+    # Sidebar .subSchh appears on every page. If it carried title= root-slug
+    # anchors (live AZ pages do), they'd leak into discovery. Use a controlled
+    # HTML: sidebar anchor with title= must NOT appear in output.
+    html = (
+        '<div class="subSchh"><a title="Sidebar Leak" href="/sidebar-leak/"></a></div>'
+        '<div class="list"><a title="Real Series" href="/real-series/"></a></div>'
+    )
+    items = _lists.parse_update_list(html)
+    slugs = {i["slug"] for i in items}
+    assert "sidebar-leak" not in slugs, "sidebar anchor leaked — _strip_sidebar not applied"
+    assert "real-series" in slugs
 
 def test_walk_directory_paginates_until_empty():
     # show "0-9": page1 empty -> stop. show "A": page1 has 2, page2 empty -> stop.
@@ -36,3 +43,7 @@ def test_walk_directory_paginates_until_empty():
     items = _lists.walk_directory(cx)
     assert len(items) == 2
     assert {i["slug"] for i in items} == {"ape", "ark"}
+    # URL form must match brief: /az-lists/page/{page}/?show={show} (not ?page=).
+    a_urls = [c.args[0] for c in cx.get.call_args_list]
+    assert a_urls[0] == "https://anichin.moe/az-lists/page/1/?show=0-9", a_urls[0]
+    assert a_urls[1] == "https://anichin.moe/az-lists/page/1/?show=A", a_urls[1]
