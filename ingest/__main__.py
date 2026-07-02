@@ -19,6 +19,18 @@ import sys
 from sloane.ingest.samehadaku import ingest_feed, discover_new_series as discover_samehadaku, backfill_all as backfill_samehadaku
 from sloane.ingest.anichin import ingest_updates as ingest_anichin, discover_new_series as discover_anichin, backfill_all as backfill_anichin
 
+
+def _pos_int(name):
+    """argparse type for --workers: reject <=0 at the trust boundary (Semaphore
+    would otherwise raise ValueError mid-backfill)."""
+    def parse(v):
+        n = int(v)
+        if n < 1:
+            raise argparse.ArgumentTypeError(f"{name} must be >= 1, got {n}")
+        return n
+    return parse
+
+
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(prog="sloane-ingest")
     p.add_argument("source", choices=["samehadaku", "anichin"])
@@ -29,8 +41,8 @@ def main(argv: list[str] | None = None) -> int:
                    help="full historical ingest (all series + all episodes)")
     p.add_argument("--max-new", type=int, default=None,
                    help="cap new items ingested (smoke); for --backfill caps series count")
-    p.add_argument("--workers", type=int, default=6,
-                   help="concurrency for --backfill (default 6)")
+    p.add_argument("--workers", type=_pos_int("workers"), default=6,
+                   help="concurrency for --backfill (default 6, must be >= 1)")
     args = p.parse_args(argv)
 
     if args.source == "samehadaku":
