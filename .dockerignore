@@ -1,0 +1,10 @@
+.git
+.venv-adk
+__pycache__
+*.pyc
+agents
+.pytest_cache
+tests
+docs
+deploy
+*.log
