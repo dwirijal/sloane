@@ -4,9 +4,18 @@
 -- entity_source_links: N raw -> 1 canonical. external_ids: multi-registry IDs (MAL/AniList/OMDB/TVDB).
 
 -- 1. rename existing table to raw (was canonical_entities, holds raw per-source rows)
-ALTER TABLE canonical_entities RENAME TO raw_entities;
-ALTER INDEX IF EXISTS idx_canonical_kind RENAME TO idx_raw_kind;
-ALTER INDEX IF EXISTS idx_canonical_payload_gin RENAME TO idx_raw_payload_gin;
+-- ponytail: guard re-run — after 001+003 first apply, canonical_entities is the NEW
+-- (merged-truth) table. Unguarded RENAME would rename it back to raw_entities → disaster.
+-- Skip rename if raw_entities already exists (idempotent on every worker startup).
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.tables
+                 WHERE table_schema='public' AND table_name='raw_entities') THEN
+    ALTER TABLE canonical_entities RENAME TO raw_entities;
+    ALTER INDEX IF EXISTS idx_canonical_kind RENAME TO idx_raw_kind;
+    ALTER INDEX IF EXISTS idx_canonical_payload_gin RENAME TO idx_raw_payload_gin;
+  END IF;
+END $$;
 
 -- 2. canonical (merged truth). dedup by kind+normalized_title.
 CREATE TABLE IF NOT EXISTS canonical_entities (
