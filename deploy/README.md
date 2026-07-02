@@ -24,12 +24,19 @@ must be up for them to run.
    ssh-copy-id dwizzy@192.168.100.6
    ssh dwizzy@192.168.100.6 true   # should not prompt
    ```
-2. **ROUTER_API_KEY** (LLM for merge fuzzy-match + Jikan-free enrich). Create:
+2. **`~/.config/sloane/ingest.env`** (DB password + LLM key — not committed). Create:
    ```
    mkdir -p ~/.config/sloane
-   echo "ROUTER_API_KEY=your-9router-key" > ~/.config/sloane/ingest.env
+   cat > ~/.config/sloane/ingest.env <<'EOF'
+   DOS_PGB_URL=postgresql://dwizzy:<DB_PASSWORD>@192.168.100.6:6432/dwizzyos
+   ROUTER_API_KEY=your-9router-key
+   EOF
+   chmod 600 ~/.config/sloane/ingest.env
    ```
-   (The 9router base URL is set in the service: `http://192.168.100.6:20128/v1`.)
+   On the homeserver the DB password is the docker secret — populate it with:
+   `PW=$(docker exec DOS-pg cat /run/secrets/dos_pg_password); sed -i "s/<DB_PASSWORD>/$PW/" ~/.config/sloane/ingest.env`
+   (The 9router base URL is set inline in the service: `http://192.168.100.6:20128/v1`.
+   The `.service` files **require** this file — missing it, systemd refuses to start.)
 3. **Python venv + deps** already at
    `/home/dwirijal/Projects/dwizzyOS/.venv-adk` (bs4, httpx, psycopg).
 
@@ -70,22 +77,37 @@ journalctl --user -u sloane-anichin-ingest.service -f      # live ingest logs
 
 A manual one-off (no timers needed):
 ```
-PYTHONPATH=/home/dwirijal/Projects/dwizzyOS:/home/dwirijal/Projects/dwizzyOS/dwizzyOS-HQ \
-DOS_PGB_URL=postgresql://dwizzy:kultivasimusemangatku@localhost:6432/dwizzyos \
-/home/dwirijal/Projects/dwizzyOS/.venv-adk/bin/python -m sloane.ingest samehadaku --max-new 1
+set -a; . ~/.config/sloane/ingest.env; set +a
+PYTHONPATH=$HOME/dwizzyOS:$HOME/dwizzyOS-HQ \
+$HOME/dwizzyOS/.venv-adk/bin/python -m sloane.ingest samehadaku --max-new 1
 ```
 
 An anichin manual one-off (same pattern, `anichin` source arg):
 ```
-PYTHONPATH=/home/dwirijal/Projects/dwizzyOS:/home/dwirijal/Projects/dwizzyOS/dwizzyOS-HQ \
-DOS_PGB_URL=postgresql://dwizzy:kultivasimusemangatku@localhost:6432/dwizzyos \
-/home/dwirijal/Projects/dwizzyOS/.venv-adk/bin/python -m sloane.ingest anichin --max-new 1
+set -a; . ~/.config/sloane/ingest.env; set +a
+PYTHONPATH=$HOME/dwizzyOS:$HOME/dwizzyOS-HQ \
+$HOME/dwizzyOS/.venv-adk/bin/python -m sloane.ingest anichin --max-new 1
 ```
+(`set -a`/`.` are shell builtins — no new dep, robust against special chars in values.)
 
-## Alternative: run timers on the homeserver
+## Running timers on the homeserver (primary deploy target)
 
-The homeserver does NOT currently have a sloane checkout, venv, or
-dwizzyOS-HQ. If you'd rather run the timers there (no tunnel — `DOS-pgb` is
-local at `127.0.0.1:6432`), clone sloane + HQ there, create a venv with
-bs4/httpx/psycopg, and change the service `Environment=DOS_PGB_URL=...@127.0.0.1:6432/...`
-+ drop the tunnel dependency. Cleaner for 24/7 (no SSH tunnel to babysit).
+The homeserver already has `~/dwizzyOS/.venv-adk` (httpx/bs4/psycopg),
+`~/dwizzyOS-HQ` (shared/), and the Docker `DOS-pg`+`DOS-pgb` containers — so
+the DB is **local** and no SSH tunnel is needed (cleaner for 24/7). The deploy
+units use `%h`-relative paths and `After=docker.service` (no tunnel dependency).
+
+To deploy there:
+```
+ssh dwizzy@192.168.100.6
+rm -rf ~/sloane   # stale stub
+git clone git@github.com:dwirijal/sloane.git ~/dwizzyOS/sloane
+# create ingest.env per Prerequisites step 2 (password = docker secret)
+cp ~/dwizzyOS/sloane/deploy/sloane-*.service ~/dwizzyOS/sloane/deploy/sloane-*.timer \
+   ~/.config/systemd/user/
+systemctl --user daemon-reload
+systemctl --user enable --now sloane-anichin-ingest.timer sloane-anichin-discover.timer \
+   sloane-samehadaku-ingest.timer sloane-samehadaku-discover.timer
+```
+(homeserver login shell is fish — wrap multi-command steps in `bash -lc '...'` over SSH.)
+

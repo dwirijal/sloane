@@ -32,11 +32,14 @@ samehadaku, **not** a `.fetch()` source plugin.
 ```
 python:   /home/dwirijal/Projects/dwizzyOS/.venv-adk/bin/python
 PYTHONPATH: /home/dwirijal/Projects/dwizzyOS:/home/dwirijal/Projects/dwizzyOS/dwizzyOS-HQ
-DOS_PGB_URL: postgresql://dwizzy:kultivasimusemangatku@localhost:6432/dwizzyos
+DOS_PGB_URL: postgresql://dwizzy:<DB_PASSWORD>@192.168.100.6:6432/dwizzyos  # set in ~/.config/sloane/ingest.env (not committed)
 ```
 
-DB is the homeserver pgbouncer (`192.168.100.6`, localhost-only `:6432`), reached via the
-`sloane-db-tunnel.service` SSH tunnel. Local Docker `:5432` is **NOT** sloane's DB.
+DB is the homeserver pgbouncer (`DOS-pgb` container, `192.168.100.6:6432`). On the homeserver
+the DB is local (no tunnel); on dev it's reached via `sloane-db-tunnel.service`. The real
+password is the docker secret `/run/secrets/dos_pg_password` (read via `docker exec DOS-pg`),
+NOT the stale `kultivasimusemangatku` value — that fails auth. Local Docker `:5432` is **NOT**
+sloane's DB.
 
 ## Tests
 

@@ -14,6 +14,7 @@ Prints JSON result to stdout (journald captures it under systemd).
 from __future__ import annotations
 import argparse
 import json
+import os
 import sys
 
 from sloane.ingest.samehadaku import ingest_feed, discover_new_series as discover_samehadaku, backfill_all as backfill_samehadaku
@@ -44,6 +45,14 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--workers", type=_pos_int("workers"), default=6,
                    help="concurrency for --backfill (default 6, must be >= 1)")
     args = p.parse_args(argv)
+
+    # DOS_PGB_URL guard: pg_dsn() (shared/config.py) silently falls back to a
+    # stale default password + wrong DB when this is unset. Fail loud at CLI
+    # entry instead. After parse_args so --help still works.
+    # ponytail: lift to shared/config.py when upstream drops the hardcoded default.
+    if not os.environ.get("DOS_PGB_URL"):
+        sys.stderr.write("DOS_PGB_URL unset; set in ~/.config/sloane/ingest.env\n")
+        return 2
 
     if args.source == "samehadaku":
         if args.backfill:

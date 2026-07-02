@@ -2,6 +2,8 @@ __pycache__/
 *.pyc
 .venv-adk/
 .env
+ingest.env
+# ponytail: real file is out-of-tree at ~/.config/sloane/; catches accidental in-repo copy only.
 *.log
 .pytest_cache/
 

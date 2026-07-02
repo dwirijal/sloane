@@ -1,20 +1,15 @@
 [Unit]
 Description=sloane samehadaku 2h feed-delta ingest
-After=network-online.target sloane-db-tunnel.service
+After=network-online.target docker.service
 Wants=network-online.target
-Requires=sloane-db-tunnel.service
 
 [Service]
 Type=oneshot
 User=dwizzy
-WorkingDirectory=/home/dwirijal/Projects/dwizzyOS/sloane
-Environment=PYTHONPATH=/home/dwirijal/Projects/dwizzyOS:/home/dwirijal/Projects/dwizzyOS/dwizzyOS-HQ
-# DOS-pgb is homeserver-local (127.0.0.1:6432), reached here via an SSH
-# tunnel forwarding local 6432 -> homeserver 127.0.0.1:6432 (see
-# sloane-db-tunnel.service). pg_dsn() reads DOS_PGB_URL first.
-Environment=DOS_PGB_URL=postgresql://dwizzy:kultivasimusemangatku@localhost:6432/dwizzyos
+WorkingDirectory=%h/dwizzyOS/sloane
+Environment=PYTHONPATH=%h/dwizzyOS:%h/dwizzyOS-HQ
+# DOS_PGB_URL (DB password) + ROUTER_API_KEY live in ingest.env (not committed):
+EnvironmentFile=%h/.config/sloane/ingest.env
 # 9router (LLM for merge fuzzy + enrich) lives on the homeserver too:
 Environment=ROUTER_BASE_URL=http://192.168.100.6:20128/v1
-# ROUTER_API_KEY from an env file the user creates (not committed):
-EnvironmentFile=-%h/.config/sloane/ingest.env
-ExecStart=/home/dwirijal/Projects/dwizzyOS/.venv-adk/bin/python -m sloane.ingest samehadaku
+ExecStart=%h/dwizzyOS/.venv-adk/bin/python -m sloane.ingest samehadaku

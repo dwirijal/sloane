@@ -1,15 +1,13 @@
 [Unit]
 Description=sloane samehadaku daily new-series discovery
-After=network-online.target sloane-db-tunnel.service
+After=network-online.target docker.service
 Wants=network-online.target
-Requires=sloane-db-tunnel.service
 
 [Service]
 Type=oneshot
 User=dwizzy
-WorkingDirectory=/home/dwirijal/Projects/dwizzyOS/sloane
-Environment=PYTHONPATH=/home/dwirijal/Projects/dwizzyOS:/home/dwirijal/Projects/dwizzyOS/dwizzyOS-HQ
-Environment=DOS_PGB_URL=postgresql://dwizzy:kultivasimusemangatku@localhost:6432/dwizzyos
+WorkingDirectory=%h/dwizzyOS/sloane
+Environment=PYTHONPATH=%h/dwizzyOS:%h/dwizzyOS-HQ
 Environment=ROUTER_BASE_URL=http://192.168.100.6:20128/v1
-EnvironmentFile=-%h/.config/sloane/ingest.env
-ExecStart=/home/dwirijal/Projects/dwizzyOS/.venv-adk/bin/python -m sloane.ingest samehadaku --discover
+EnvironmentFile=%h/.config/sloane/ingest.env
+ExecStart=%h/dwizzyOS/.venv-adk/bin/python -m sloane.ingest samehadaku --discover
