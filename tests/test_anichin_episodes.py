@@ -9,7 +9,15 @@ FIX = Path(__file__).parent / "fixtures"
 def test_parse_episode_extracts_n_and_stream():
     d = _episodes.parse_episode((FIX / "anichin_episode.html").read_text())
     assert d["n"] == 670
-    assert d["stream_url"] and "dailymotion" in d["stream_url"]
+    # host-agnostic: anichin uses dailymotion, ok.ru, others per-series.
+    assert d["stream_url"] and d["stream_url"].startswith("http")
+
+
+def test_parse_episode_okru_host():
+    # aliens-among-immortals uses ok.ru, not dailymotion — must still capture.
+    d = _episodes.parse_episode((FIX / "anichin_episode_okru.html").read_text())
+    assert d["n"] == 38
+    assert d["stream_url"] and "ok.ru" in d["stream_url"]
 
 
 def test_parse_episode_no_iframe_returns_none_stream():
