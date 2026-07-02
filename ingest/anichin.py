@@ -261,7 +261,8 @@ async def _backfill_async(dsn, series, workers, log) -> dict:
             set_state(dsn, SOURCE, BACKFILL_KEY, sorted(done))
             log(f"backfill: {min(i + BATCH, len(series))}/{len(series)} "
                 f"(ingested {ingested}, failed {failed})")
-    return {"total": len(series), "ingested": ingested, "failed": failed}
+    return {"total": len(series), "ingested": ingested, "failed": failed,
+            "skipped_existing": 0}
 
 
 def backfill_all(dsn: str | None = None, workers: int = BACKFILL_WORKERS,
