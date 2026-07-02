@@ -229,14 +229,14 @@ async def _fetch_series_full(cx, sem, slug: str, title: str) -> dict | None:
     }
 
 
-async def _backfill_async(dsn, series, workers, log) -> dict:
+async def _backfill_async(dsn, series, done, workers, log) -> dict:
+    """series = new (not-yet-done) slugs; done mutated as each completes."""
     sem = asyncio.Semaphore(workers)
     ingested = failed = 0
-    done: set[str] = set(get_state(dsn, SOURCE, BACKFILL_KEY, default=[]) or [])
     async with httpx.AsyncClient(headers=_http.HEADERS, follow_redirects=True) as cx:
         BATCH = 10
         for i in range(0, len(series), BATCH):
-            chunk = [s for s in series[i:i + BATCH] if s["slug"] not in done]
+            chunk = series[i:i + BATCH]
             if not chunk:
                 continue
             results = await asyncio.gather(
@@ -261,8 +261,7 @@ async def _backfill_async(dsn, series, workers, log) -> dict:
             set_state(dsn, SOURCE, BACKFILL_KEY, sorted(done))
             log(f"backfill: {min(i + BATCH, len(series))}/{len(series)} "
                 f"(ingested {ingested}, failed {failed})")
-    return {"total": len(series), "ingested": ingested, "failed": failed,
-            "skipped_existing": 0}
+    return ingested, failed
 
 
 def backfill_all(dsn: str | None = None, workers: int = BACKFILL_WORKERS,
@@ -280,11 +279,15 @@ def backfill_all(dsn: str | None = None, workers: int = BACKFILL_WORKERS,
 
     done: set[str] = set(get_state(dsn, SOURCE, BACKFILL_KEY, default=[]) or [])
     new_series = [s for s in all_series if s["slug"] not in done]
+    skipped = len(all_series) - len(new_series)
     log(f"backfill: {len(all_series)} series in directory, "
-        f"{len(new_series)} new ({len(all_series) - len(new_series)} already done)")
+        f"{len(new_series)} new ({skipped} already done)")
 
     if not new_series:
-        return {"total": 0, "ingested": 0, "failed": 0,
-                "skipped_existing": len(all_series)}
+        return {"total": len(all_series), "ingested": 0, "failed": 0,
+                "skipped_existing": skipped}
 
-    return asyncio.run(_backfill_async(dsn, all_series, workers, log))
+    ingested, failed = asyncio.run(
+        _backfill_async(dsn, new_series, done, workers, log))
+    return {"total": len(all_series), "ingested": ingested, "failed": failed,
+            "skipped_existing": skipped}
