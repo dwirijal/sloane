@@ -5,7 +5,6 @@ Wants=network-online.target
 
 [Service]
 Type=oneshot
-User=dwizzy
 WorkingDirectory=%h/dwizzyOS/sloane
 Environment=PYTHONPATH=%h/dwizzyOS:%h/dwizzyOS-HQ
 Environment=ROUTER_BASE_URL=http://192.168.100.6:20128/v1
