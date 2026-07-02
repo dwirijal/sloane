@@ -58,22 +58,26 @@ def parse_update_list(html: str) -> list[dict]:
 
 
 def walk_directory(cx) -> list[dict]:
-    """Walk /az-lists/?show=<LETTER> front-to-back, paginate until empty.
+    """Walk /az-lists/ A-Z, following the .next pagination link per letter.
 
-    cx is an httpx.Client-like with .get(url).text; caller owns lifecycle.
+    anichin serves stale content on out-of-range page numbers (page 50 of a
+    4-page letter still returns items), so blind page++ never terminates —
+    we follow the Next » link instead and stop when it disappears. cx is an
+    httpx.Client-like with .get(url).text; caller owns lifecycle.
     """
     out: list[dict] = []
+    seen: set[str] = set()
     for show in _SHOWS:
-        page = 1
-        while True:
-            url = f"{_http.BASE_URL}/az-lists/page/{page}/?show={show}"
+        url = f"{_http.BASE_URL}/az-lists/page/1/?show={show}"
+        while url:
             soup = BeautifulSoup(cx.get(url).text, "lxml")
             _strip_sidebar(soup)
-            items = _series_anchors(soup)
-            if not items:
-                break
-            for it in items:
-                if it["slug"] not in {x["slug"] for x in out}:
+            for it in _series_anchors(soup):
+                if it["slug"] not in seen:
+                    seen.add(it["slug"])
                     out.append(it)
-            page += 1
+            # Next page link (.next a.page-numbers); absent on the last page.
+            nxt = soup.select_one("a.next.page-numbers, .pagination a.next")
+            href = nxt.get("href") if nxt else None
+            url = f"{_http.BASE_URL}{href}" if href and href.startswith("/") else href
     return out
